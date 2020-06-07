@@ -1,13 +1,6 @@
-"""
-1. Figure out what software for each class and insert it into the appropriate cell.
-2. Export each data frame as a different page to an .xlsx file
-3. Add input prompts so that this can be applied to future sheets
-4. What to do with weird course #'s?
-5. github
-"""
-
-
 import pandas as pd
+import numpy as np
+
 # options
 pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 8)
@@ -19,25 +12,29 @@ data = pd.ExcelFile('339LabReport.xlsx')
 # create data frame
 df = data.parse(sheetname='Sheet1', skiprows=7)
 
+# saving unedited original data to use as last page in workbook 
+df_unedited_data = data.parse(sheetname='Sheet1', skiprows=7)
+
 # set variable to columns
-#col1 = list(df.columns)
+col1 = list(df.columns)
 
 # remove empty columns and rename existing ones
-df = df.drop(["Unnamed: 0","Unnamed: 3","Unnamed: 5","Unnamed: 7"],
+df_unedited_data, df = df.drop(["Unnamed: 0","Unnamed: 3","Unnamed: 5","Unnamed: 7"],
              axis=1).iloc[4:,:].rename(columns=
-                                             {'Title/Meeting Name':'Class Name',
-                                              'Course/Reservation #':'Course #',
-                                              'Subject/Customer':'Department',
-                                              'Instructor/Contact':'Instructor',
-                                              'Date':'Date',
-                                              'Software':'Software'
-                                              })
+                                       {'Title/Meeting Name':'Class Name',
+                                        'Course/Reservation #':'Course #',
+                                        'Subject/Customer':'Department',
+                                        'Instructor/Contact':'Instructor',
+                                        'Date':'Date',
+                                        'Software':'Software'
+                                        })
 
 # drop all NaN rows
 df.dropna(how='all', inplace=True)
 
 # correct data type of Date to datetime64[ns]
 df['Date'] = pd.to_datetime(df['Date'])
+print(df.info())
 
 # create mask so that data frames only include certain date range
 fall_start_date = '2019-08-21'
@@ -57,10 +54,29 @@ df_fall = df.sort_values(by=['Department', 'Course #', 'Date'], axis=0, ascendin
 df_winter = df.sort_values(by=['Department', 'Course #', 'Date'], axis=0, ascending=True).loc[mask_winter]
 df_spring = df.sort_values(by=['Department', 'Course #', 'Date'], axis=0, ascending=True).loc[mask_spring]
 
-print(df_fall.head(50))
-print(df_winter.head(50))
-print(df_spring.head(50))
+# set names for sheets
+dfs = {'Fall_Semester': df_fall,
+       'Winter_Semester': df_winter,
+       'Spring_Semester': df_spring,
+       'Unedited_Data': df_unedited_data}
 
-#print("\n INFO: \n")
-#print(df.info())
+# writer object
+writer = pd.ExcelWriter('OIIR_Astra_Summary.xlsx',
+                        engine = 'xlsxwriter',
+                        date_format = 'yyyy-mm-dd', # set date format
+                        datetime_format = 'yyyy-mm-dd') # set date time format to leave out time
 
+# auto size columns
+for sheetname, df in dfs.items():  # loop through `dict` of dataframes
+    df.to_excel(writer, sheet_name=sheetname, index=False)  # send df to writer
+    worksheet = writer.sheets[sheetname]  # pull worksheet object
+    for idx, col in enumerate(df):  # loop through all columns
+        series = df[col]
+        max_len = max((
+            series.astype(str).map(len).max(),  # len of largest item
+            len(str(series.name))  # len of column name/header
+        )) + 1  # adding a little extra space
+        worksheet.set_column(idx, idx, max_len)  # set column width
+
+# save file
+writer.save()
