@@ -1,4 +1,4 @@
-.xlsl
-.ods
-.txt
+*.xlsl
+*.ods
+*.txt
 /backups
